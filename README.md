@@ -10,6 +10,16 @@ This first version is a static HTML/CSS/JavaScript site. From this folder, start
 
 The **Load Data** button reads a selected JSON file in the browser. The file is not uploaded by the app. The current page starts with clearly labeled sample data; it does not contain your job-search records.
 
+For the local job-search snapshot, create the map's JSON file with:
+
+```bash
+python3 scripts/prepare_local_data.py
+```
+
+This reads the Markdown application log, keeps records with a submitted date, groups multiple roles under one company, and writes `data/private/jobquestr.json`. It leaves the source workbooks and Markdown files unchanged. Prospects that have not been applied to are excluded. Location overrides live in the ignored `data/private/location-overrides.json` file. Approximate pins are marked in the company card; confirm exact worksite addresses before using them for commute planning.
+
+Then open the site, choose **Load Data**, and select `data/private/jobquestr.json`. The generated file and the location overrides are excluded from Git and from the GitHub Pages deployment.
+
 The JSON file should have this general structure:
 
 ```json
@@ -40,7 +50,11 @@ The JSON file should have this general structure:
 }
 ```
 
-Coordinates use `[longitude, latitude]`. Company records without coordinates can still be imported but will not get a map pin. The next data step is to prepare a private JSON file from the local spreadsheet and Markdown snapshot.
+Coordinates use `[longitude, latitude]`. Company records without coordinates can still be imported but will not get a map pin. The application Markdown log is the source for submitted roles; the Excel workbooks are used as supplemental job-browse and employer-watchlist information.
+
+## Use with your own data and AI assistant
+
+`AGENTS.md` is the reusable guide for preparing another person's data. They can give that file and their selected job-search sources to an AI assistant and ask it to create a private JSON file in the format above. The assistant should leave the originals unchanged and keep the resulting JSON out of the public repository. Then they can use **Load Data** to open their own file in the website. This is a separate data-preparation step; the website does not connect to or require a ChatGPT account.
 
 ## GitHub Pages
 

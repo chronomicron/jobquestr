@@ -20,6 +20,7 @@ const byId = (id) => document.getElementById(id);
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const selectedCompany = () => data.companies.find((company) => company.id === selectedId) || data.companies[0];
 const currentApplications = () => data.companies.flatMap((company) => (company.applications || []).map((application) => ({ ...application, companyName: company.name, companyId: company.id })));
+const latestApplication = (company) => [...(company?.applications || [])].sort((a, b) => (b.appliedAt || '').localeCompare(a.appliedAt || ''))[0];
 
 function showToast(message) {
   const toast = byId('toast');
@@ -31,6 +32,7 @@ function showToast(message) {
 
 function statusColor(status = '') {
   if (/interview/i.test(status)) return '#38dfff';
+  if (/not selected|rejected/i.test(status)) return '#ff43c6';
   if (/follow/i.test(status)) return '#ff43c6';
   return '#00f2a5';
 }
@@ -52,28 +54,31 @@ function renderCompany() {
     byId('application-details').innerHTML = '';
     return;
   }
-  const application = (company.applications || [])[0];
+  const applications = [...(company.applications || [])].sort((a, b) => (b.appliedAt || '').localeCompare(a.appliedAt || ''));
+  const application = applications[0];
   const status = application?.status || 'Prospect';
+  const statusTagClass = status === 'Not selected' ? 'pink' : status === 'Interview' ? 'blue' : 'green';
   const website = company.website ? `<a class="small-link" href="${escapeHtml(company.website)}" target="_blank" rel="noreferrer">COMPANY SITE ↗</a>` : '';
   const glassdoor = company.glassdoorUrl ? `<a class="small-link" href="${escapeHtml(company.glassdoorUrl)}" target="_blank" rel="noreferrer">GLASSDOOR ↗</a>` : '';
   byId('company-card').innerHTML = `
     <div class="company-art"><span class="selected-badge">◉ &nbsp;SELECTED</span></div>
     <div class="company-info">
       <div class="company-heading"><div><h2>${escapeHtml(company.name)}</h2><div class="company-sector">${escapeHtml(company.sector || 'Company')}</div></div></div>
-      <div class="company-meta"><span class="loc"><span>⌖</span>${escapeHtml(company.address || 'Address not provided')}</span><span class="distance">${company.distance ? escapeHtml(company.distance) : '—'}</span></div>
-      <div class="tag-row"><span class="tag green">${escapeHtml(status)}</span><span class="tag blue">${escapeHtml(application?.workMode || 'LOCATION')}</span><span class="tag pink">${escapeHtml(application?.priority || 'TRACKED')}</span></div>
+      <div class="company-meta"><span class="loc"><span>⌖</span>${escapeHtml(company.address || 'Address not provided')}</span><span class="distance">${company.locationPrecision === 'approximate' ? 'AREA PIN' : (company.distance ? escapeHtml(company.distance) : '—')}</span></div>
+      ${company.locationNote ? `<div class="location-note">${escapeHtml(company.locationNote)}</div>` : ''}
+      <div class="tag-row"><span class="tag ${statusTagClass}">${escapeHtml(status)}</span><span class="tag blue">${escapeHtml(application?.workMode || 'LOCATION')}</span><span class="tag pink">${escapeHtml(application?.priority || 'TRACKED')}</span></div>
       <div class="company-desc">${escapeHtml(company.summary || 'Company details and application notes appear here when available in your local data file.')}</div>
       <div class="company-links">${website}${glassdoor || '<span class="small-link muted-link">GLASSDOOR LINK</span>'}<button class="small-link" id="streetview-link" type="button">STREET VIEW ↗</button></div>
     </div>`;
   byId('streetview-link')?.addEventListener('click', () => showToast('Street View integration is planned for a later version.'));
-  byId('application-details').innerHTML = application ? `
-    <div class="app-role">${escapeHtml(application.role || 'Role not specified')}</div>
-    <div class="app-date">APPLIED &nbsp;${escapeHtml(formatDate(application.appliedAt))}</div>
-    <div class="status-track">
-      <div class="track-line"><span class="track-point complete"></span></div><div class="track-copy"><b>Application submitted</b><small>${escapeHtml(formatDate(application.appliedAt))}</small></div>
-      <div class="track-line"><span class="track-point ${/review|interview|offer/i.test(status) ? 'complete' : ''}"></span></div><div class="track-copy"><b>${escapeHtml(status)}</b><small>${escapeHtml(application.lastUpdated ? formatDate(application.lastUpdated) : 'Latest status')}</small></div>
-      <div class="track-line"><span class="track-point"></span></div><div class="track-copy"><b>Next step</b><small>${escapeHtml(application.nextAction || 'No follow-up scheduled')}</small></div>
-    </div>` : '<div class="empty-state">No applications recorded for this company yet.</div>';
+  byId('application-details').innerHTML = applications.length ? applications.map((item) => `
+    <article class="application-entry">
+      <div class="application-role-row"><div class="app-role">${escapeHtml(item.role || 'Role not specified')}</div><span class="tag ${item.status === 'Not selected' ? 'pink' : item.status === 'Interview' ? 'blue' : 'green'}">${escapeHtml(item.status || 'Applied')}</span></div>
+      <div class="app-date">APPLIED &nbsp;${escapeHtml(formatDate(item.appliedAt))}${item.positionId ? ` &nbsp;·&nbsp; ${escapeHtml(item.positionId)}` : ''}</div>
+      ${item.location ? `<div class="application-location"><b>WORKSITE</b> ${escapeHtml(item.location)}</div>` : ''}
+      ${item.sourceStatus ? `<div class="application-source-status">${escapeHtml(item.sourceStatus)}</div>` : ''}
+      ${item.postingUrl ? `<a class="small-link application-posting" href="${escapeHtml(item.postingUrl)}" target="_blank" rel="noreferrer">VIEW POSTING ↗</a>` : ''}
+    </article>`).join('') : '<div class="empty-state">No applications recorded for this company yet.</div>';
   byId('notes-button').setAttribute('data-notes', application?.notes || 'No local notes for this company.');
   byId('data-mode').textContent = data.label || 'LOCAL DATA';
 }
@@ -122,7 +127,7 @@ function drawMarkers() {
   clearMarkers();
   const visibleCompanies = data.companies.filter((company) => Array.isArray(company.coordinates) && company.coordinates.length === 2);
   for (const company of visibleCompanies) {
-    const app = (company.applications || [])[0];
+    const app = latestApplication(company);
     const color = statusColor(app?.status);
     const node = document.createElement('button');
     node.type = 'button';
@@ -154,7 +159,7 @@ function applyFilters() {
   const query = byId('search').value.trim().toLowerCase();
   const status = byId('status-filter').value;
   const matching = data.companies.filter((company) => {
-    const app = (company.applications || [])[0];
+    const app = latestApplication(company);
     const matchesQuery = !query || [company.name, company.sector, company.address, ...(company.applications || []).map((item) => item.role)].join(' ').toLowerCase().includes(query);
     const matchesStatus = status === 'all' || (company.applications || []).some((item) => item.status === status);
     return matchesQuery && matchesStatus && (status === 'all' || app);

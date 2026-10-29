@@ -1,4 +1,5 @@
 # Personal source files and generated private data
+/data/source_snapshot/resume/*.pdf
 /data/source_snapshot/
 /data/private/
 /data/generated/
