@@ -1,0 +1,19 @@
+# Personal source files and generated private data
+/data/source_snapshot/
+/data/private/
+/data/generated/
+
+# Local credentials and environment files
+.env
+.env.*
+!.env.example
+
+# Frontend build and package outputs
+node_modules/
+dist/
+.vite/
+
+# Local editor and operating-system files
+.DS_Store
+Thumbs.db
+.vscode/
