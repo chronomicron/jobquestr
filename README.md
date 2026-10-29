@@ -67,3 +67,5 @@ Never commit `data/source_snapshot/`, `data/private/`, `data/generated/`, local 
 ## Map services
 
 The site uses MapLibre GL JS to render a dark vector map from OpenFreeMap. The visible map attribution is included in the map controls. The site also loads its typefaces from Google Fonts.
+
+Statcounter analytics runs on `chronomicron.com`, `www.chronomicron.com`, and `chronomicron.github.io` to measure public-site traffic. It does not run on `localhost` during development.

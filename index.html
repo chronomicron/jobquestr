@@ -9,6 +9,18 @@
     <link rel="preconnect" href="https://tiles.openfreemap.org" />
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.css" />
     <link rel="stylesheet" href="./src/style.css" />
+    <!-- Statcounter analytics runs on the public site domains, not on localhost. -->
+    <script>
+      if (["chronomicron.com", "www.chronomicron.com", "chronomicron.github.io"].includes(window.location.hostname)) {
+        var sc_project = 13363859;
+        var sc_invisible = 1;
+        var sc_security = "15f834e8";
+        var sc_counter = document.createElement("script");
+        sc_counter.src = "https://www.statcounter.com/counter/counter.js";
+        sc_counter.async = true;
+        document.head.appendChild(sc_counter);
+      }
+    </script>
   </head>
   <body>
     <div class="app-shell">

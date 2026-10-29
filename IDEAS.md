@@ -11,6 +11,8 @@ A parking lot for useful features to consider after the first version is working
 - A “Today” view on opening the site, highlighting interviews, follow-ups, deadlines, and other dated tasks (for example, reminding you to follow up with a company).
 - A per-application checklist for steps such as sending a resume, asking for a referral, and completing an interview.
 - A way to mark priority applications and keep them easy to find.
+- Add custom company pins for future prospects, with a note such as “Future prospect,” a link to the company careers page, and an optional reminder to check back.
+- Add a discreet Donate button in a corner. It could open a synthwave-styled popup with configurable options such as Ko-fi and other ways to support the project.
 - A notes area for application-specific notes.
 - Remember a user's selected job-search folder or workbook so the map can reconnect to local data on later visits, subject to browser support and permission prompts.
 - Support an empty starter workbook or template that users can fill with their own job-search data.
