@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07110f" />
+    <meta name="description" content="A personal job search map for Greater Montréal." />
+    <title>JobQuestR — Job search, in motion</title>
+    <link rel="preconnect" href="https://tiles.openfreemap.org" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.16.0/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="JobQuestR home">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>JOBQUEST<span class="brand-r">R</span></span>
+        </a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <button class="nav-item active" type="button">MAP</button>
+          <button class="nav-item" type="button" data-toast="Resume library is planned for a later version">RESUMES</button>
+          <button class="nav-item" type="button" data-toast="Cover letter library is planned for a later version">COVER LETTERS</button>
+          <button class="nav-item" type="button" data-toast="Activity statistics are planned for a later version">ACTIVITY</button>
+        </nav>
+        <div class="top-summary" aria-label="Daily overview">
+          <div class="summary-heading"><span class="pulse-dot"></span><span id="today-date">TODAY</span><span class="summary-separator">/</span><span class="summary-soft">ON THE RADAR</span></div>
+          <div class="summary-metrics">
+            <div><strong id="summary-applications">03</strong><span>tracked</span></div>
+            <div><strong id="summary-interviews" class="cyan">01</strong><span>interview</span></div>
+            <div><strong id="summary-followups" class="magenta">01</strong><span>follow-up</span></div>
+          </div>
+        </div>
+        <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch to light mode" title="Switch theme"><span class="theme-icon">☼</span><span class="theme-label">DARK MODE</span></button>
+      </header>
+
+      <main class="workspace">
+        <aside class="left-rail panel" aria-label="Selected company details">
+          <div class="rail-topline"><button class="back-link" id="reset-map" type="button">← &nbsp;OVERVIEW</button><span class="eyebrow">COMPANY FILE</span></div>
+          <section class="company-card" id="company-card"></section>
+          <section class="application-card">
+            <button class="section-toggle" id="application-toggle" aria-expanded="true" type="button">
+              <span class="section-icon">▤</span><span>MY APPLICATION</span><span class="toggle-chevron">⌃</span>
+            </button>
+            <div id="application-details" class="application-details"></div>
+          </section>
+          <section class="quick-actions">
+            <button class="action-button primary-action" id="followup-button" type="button"><span>♧</span> SET FOLLOW-UP</button>
+            <button class="action-button secondary-action" id="notes-button" type="button"><span>✎</span> VIEW NOTES</button>
+          </section>
+          <div class="local-data-note"><span class="lock-icon">▣</span><span>Your file stays on this device.<br /><b id="data-mode">DEMO DATA</b></span></div>
+        </aside>
+
+        <section class="map-column" aria-label="Greater Montréal job search map">
+          <div class="map-toolbar">
+            <label class="search-box"><span class="search-icon">⌕</span><input id="search" type="search" placeholder="Search companies, roles, or areas…" aria-label="Search companies, roles, or areas" /></label>
+            <label class="filter-select"><span class="sr-only">Filter by status</span><select id="status-filter"><option value="all">All statuses</option><option value="Interview">Interview</option><option value="Applied">Applied</option><option value="In review">In review</option><option value="Follow-up">Follow-up</option></select><span>⌄</span></label>
+            <div class="travel-switch" role="group" aria-label="Travel mode"><button type="button" class="travel-option selected" data-mode="transit">▰ TRANSIT</button><button type="button" class="travel-option" data-mode="drive">◒ DRIVE</button></div>
+            <button class="toolbar-button" id="load-data" type="button"><span>↥</span> LOAD DATA</button>
+            <input class="visually-hidden" type="file" id="file-input" accept=".json,application/json" />
+          </div>
+          <div class="map-wrap">
+            <div id="map" role="application" aria-label="Interactive map of Montreal, Laval, and Longueuil"></div>
+            <div class="map-heading"><span class="live-label"><span class="pulse-dot"></span> LIVE VIEW</span><span>GREATER MONTRÉAL</span></div>
+            <div class="map-status" id="map-status"><span class="status-square"></span><span>3 COMPANY SIGNALS</span><span class="status-divider">·</span><span>1 SELECTED</span></div>
+            <div class="origin-chip"><span class="origin-symbol">⌂</span><span><b>YOUR START</b><small>Set a transit origin</small></span><button type="button" id="set-origin" aria-label="Set commute origin">＋</button></div>
+            <div class="route-chip" id="route-chip"><span class="route-rail">━━━</span><span><b>ROUTE PREVIEW</b><small>Connect a routing provider</small></span></div>
+            <div class="map-legend"><div class="legend-head">SIGNALS <span>● LIVE</span></div><div><span class="legend-pin green"></span> Applied</div><div><span class="legend-pin blue"></span> Interview</div><div><span class="legend-pin pink"></span> Follow-up</div><div class="legend-rule transit-rule"></div> Metro / rail</div>
+            <div class="map-corner-label">45°30′N &nbsp; 73°34′W <span>◆</span></div>
+          </div>
+          <div class="map-footer"><span>© OpenStreetMap contributors · OpenFreeMap</span><span>LOCAL DATA MODE <b>●</b></span></div>
+        </section>
+
+        <aside class="right-rail panel" aria-label="Application activity timeline">
+          <div class="timeline-header"><div><span class="eyebrow">YOUR JOB SEARCH</span><h1>ON THE RADAR<span class="accent-dot">.</span></h1></div><button class="more-button" id="timeline-filter" type="button" title="Show all activities">⋯</button></div>
+          <div class="today-card"><div class="today-top"><span class="today-tag"><span class="pulse-dot"></span> TODAY</span><span id="today-short-date">WED · OCT 29</span></div><div class="today-title" id="today-title">Your search is moving.</div><div class="today-subtitle" id="today-subtitle">One follow-up is on your radar.</div><div class="tomorrow-row"><span class="tomorrow-icon">◷</span><span><b>UP NEXT</b><small id="up-next-text">Interview tomorrow · 10:30 AM</small></span><span class="row-chevron">›</span></div></div>
+          <div class="timeline-controls"><span>ACTIVITY LOG</span><button id="activity-filter" type="button">ALL ACTIVITY <span>⌄</span></button></div>
+          <div class="timeline-list" id="timeline-list"></div>
+          <button class="view-all-button" type="button" data-toast="The full activity and statistics page is planned for a later version">VIEW ACTIVITY &amp; STATS <span>↗</span></button>
+        </aside>
+      </main>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
