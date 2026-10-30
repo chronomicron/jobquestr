@@ -67,6 +67,7 @@
           <div class="map-toolbar">
             <label class="search-box"><span class="search-icon">⌕</span><input id="search" type="search" placeholder="Search companies, roles, or areas…" aria-label="Search companies, roles, or areas" /></label>
             <label class="filter-select"><span class="sr-only">Filter by status</span><select id="status-filter"><option value="all">All statuses</option><option value="Applied">Applied</option><option value="In review">In review</option><option value="Interview">Interview</option><option value="Not selected">Not selected</option></select><span>⌄</span></label>
+            <button class="toolbar-button prospects-toggle" id="toggle-prospects" type="button" aria-pressed="true">PROSPECTS ON</button>
             <div class="travel-switch" role="group" aria-label="Travel mode"><button type="button" class="travel-option selected" data-mode="transit">▰ TRANSIT</button><button type="button" class="travel-option" data-mode="drive">◒ DRIVE</button></div>
             <button class="toolbar-button" id="load-data" type="button"><span>↥</span> LOAD DATA</button>
             <input class="visually-hidden" type="file" id="file-input" accept=".json,application/json" />
@@ -77,7 +78,7 @@
             <div class="map-status" id="map-status"><span class="status-square"></span><span>3 COMPANY SIGNALS</span><span class="status-divider">·</span><span>1 SELECTED</span></div>
             <div class="origin-chip"><span class="origin-symbol">⌂</span><span><b>YOUR START</b><small>Set a transit origin</small></span><button type="button" id="set-origin" aria-label="Set commute origin">＋</button></div>
             <div class="route-chip" id="route-chip"><span class="route-rail">━━━</span><span><b>ROUTE PREVIEW</b><small>Connect a routing provider</small></span></div>
-            <div class="map-legend"><div class="legend-head">SIGNALS <span>● LIVE</span></div><div><span class="legend-pin green"></span> Applied</div><div><span class="legend-pin blue"></span> Interview</div><div><span class="legend-pin pink"></span> Follow-up</div><div class="legend-rule transit-rule"></div> Metro / rail</div>
+            <div class="map-legend"><div class="legend-head">SIGNALS <span>● LIVE</span></div><div><span class="legend-pin green"></span> Applied</div><div><span class="legend-pin blue"></span> Interview</div><div><span class="legend-pin pink"></span> Follow-up</div><div><span class="legend-pin amber"></span> Saved post</div><div class="legend-rule transit-rule"></div> Metro / rail</div>
             <div class="map-corner-label">45°30′N &nbsp; 73°34′W <span>◆</span></div>
           </div>
           <div class="map-footer"><span>© OpenStreetMap contributors · OpenFreeMap</span><span>LOCAL DATA MODE <b>●</b></span></div>

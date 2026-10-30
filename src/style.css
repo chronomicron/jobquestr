@@ -78,3 +78,10 @@ body[data-theme="light"] .nav-item.active{text-shadow:none}
 .company-logo{position:absolute;z-index:1;left:11px;bottom:9px;max-width:150px;max-height:58px;object-fit:contain;padding:6px 8px;border:1px solid rgba(255,255,255,.22);border-radius:5px;background:rgba(5,10,18,.82);box-shadow:0 2px 10px rgba(0,0,0,.22)}
 .forget-data-button{margin-left:auto;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--muted);font:8px 'DM Mono',monospace;cursor:pointer}
 .forget-data-button[hidden]{display:none}
+.company-marker.prospect{border-style:dashed}
+.legend-pin.amber{background:var(--amber);color:var(--amber)}
+.prospects-toggle{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 55%,transparent)}
+.prospects-toggle[aria-pressed="true"]{background:color-mix(in srgb,var(--amber) 10%,var(--panel));box-shadow:0 0 10px color-mix(in srgb,var(--amber) 15%,transparent)}
+.prospects-toggle[aria-pressed="false"]{opacity:.72}
+body[data-theme="light"] .prospects-toggle{color:#825100;border-color:rgba(130,81,0,.42)}
+body[data-theme="light"] .prospects-toggle[aria-pressed="true"]{background:#fff7e5;box-shadow:0 0 10px rgba(130,81,0,.12)}

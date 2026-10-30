@@ -18,6 +18,8 @@ let markerRefs = [];
 let toastTimer;
 let origin = null;
 let originPlacementActive = false;
+let showProspects = true;
+let filteredCompanies = null;
 let geocodeCandidates = [];
 let rememberedFileHandle = null;
 
@@ -64,6 +66,15 @@ function saveOrigin() {
 const selectedCompany = () => data.companies.find((company) => company.id === selectedId) || data.companies[0];
 const currentApplications = () => data.companies.flatMap((company) => (company.applications || []).map((application) => ({ ...application, companyName: company.name, companyId: company.id })));
 const latestApplication = (company) => [...(company?.applications || [])].sort((a, b) => (b.appliedAt || '').localeCompare(a.appliedAt || ''))[0];
+const isProspect = (application) => {
+  const stage = String(application?.stage || '').toLowerCase();
+  const status = String(application?.status || '').toLowerCase();
+  if (/^(found|shortlisted|preparing|prospect|to prepare|saved)$/.test(stage)) return true;
+  if (application?.appliedAt || /^(applied|in review|interview|offer|not selected|withdrawn)$/.test(status)) return false;
+  return /prospect|to prepare|shortlist|saved|not applied/.test(`${stage} ${status} ${application?.sourceStatus || ''}`.toLowerCase());
+};
+const companyHasProspects = (company) => (company.applications || []).some(isProspect);
+const companyHasSubmittedRoles = (company) => (company.applications || []).some((application) => !isProspect(application));
 
 origin = normalizeOrigin(sampleData.origin) || loadSavedOrigin();
 
@@ -209,16 +220,19 @@ function clearMarkers() {
 function drawMarkers() {
   if (!map.isStyleLoaded()) return;
   clearMarkers();
-  const visibleCompanies = data.companies.filter((company) => Array.isArray(company.coordinates) && company.coordinates.length === 2);
+  const visibleCompanies = (filteredCompanies || data.companies).filter((company) => Array.isArray(company.coordinates) && company.coordinates.length === 2);
   for (const company of visibleCompanies) {
-    const app = latestApplication(company);
-    const color = statusColor(app?.status);
+    const submitted = (company.applications || []).filter((application) => !isProspect(application));
+    const app = latestApplication({ applications: submitted }) || latestApplication(company);
+    const prospectOnly = !submitted.length;
+    const color = prospectOnly ? (document.body.dataset.theme === 'light' ? '#825100' : '#ffbd4a') : statusColor(app?.status);
     const node = document.createElement('button');
     node.type = 'button';
-    node.className = `company-marker ${company.id === selectedId ? 'selected' : ''}`;
+    node.className = `company-marker ${prospectOnly ? 'prospect' : ''} ${company.id === selectedId ? 'selected' : ''}`.trim();
     node.style.setProperty('--pin-color', color);
     node.style.setProperty('--pin-glow', `${color}99`);
-    node.setAttribute('aria-label', `Show ${company.name}`);
+    node.setAttribute('aria-label', `Show ${company.name}${prospectOnly ? ', saved job prospect' : ''}`);
+    if (prospectOnly) node.title = 'Saved job prospect';
     node.innerHTML = `<span>${escapeHtml(initials(company.name))}</span>`;
     node.addEventListener('click', () => selectCompany(company.id));
     const marker = new maplibregl.Marker({ element: node, anchor: 'bottom' }).setLngLat(company.coordinates).addTo(map);
@@ -231,7 +245,13 @@ function drawMarkers() {
     home.setAttribute('aria-label', 'Your transit start point. Click to move it.');
     home.title = 'Your transit start point';
     home.innerHTML = '<span>⌂</span>';
-    home.addEventListener('click', beginOriginPlacement);
+    home.addEventListener('click', (event) => {
+      // Keep this click from bubbling into the map's click-to-place handler.
+      // Otherwise the click that activates repositioning is also saved as the
+      // new point, shifting the origin by the marker's visual offset.
+      event.stopPropagation();
+      beginOriginPlacement();
+    });
     markerRefs.push(new maplibregl.Marker({ element: home, anchor: 'bottom' }).setLngLat(origin.coordinates).addTo(map));
   }
   byId('map-status').innerHTML = `<span class="status-square"></span><span>${visibleCompanies.length} COMPANY SIGNAL${visibleCompanies.length === 1 ? '' : 'S'}</span><span class="status-divider">·</span><span>1 SELECTED</span>`;
@@ -290,12 +310,11 @@ function applyFilters() {
     const app = latestApplication(company);
     const matchesQuery = !query || [company.name, company.sector, company.address, ...(company.applications || []).map((item) => item.role)].join(' ').toLowerCase().includes(query);
     const matchesStatus = status === 'all' || (company.applications || []).some((item) => item.status === status);
-    return matchesQuery && matchesStatus && (status === 'all' || app);
+    const matchesProspectFilter = showProspects || !companyHasProspects(company) || companyHasSubmittedRoles(company);
+    return matchesQuery && matchesStatus && (status === 'all' || app) && matchesProspectFilter;
   });
-  const old = data.companies;
-  data.companies = matching;
+  filteredCompanies = matching;
   drawMarkers();
-  data.companies = old;
   if (matching.length && !matching.some((company) => company.id === selectedId)) selectCompany(matching[0].id);
 }
 
@@ -311,6 +330,14 @@ function validateData(value) {
 
 byId('search').addEventListener('input', applyFilters);
 byId('status-filter').addEventListener('change', applyFilters);
+byId('toggle-prospects').addEventListener('click', (event) => {
+  showProspects = !showProspects;
+  const button = event.currentTarget;
+  button.setAttribute('aria-pressed', String(showProspects));
+  button.textContent = showProspects ? 'PROSPECTS ON' : 'PROSPECTS OFF';
+  button.title = showProspects ? 'Hide saved and shortlisted job posts' : 'Show saved and shortlisted job posts';
+  applyFilters();
+});
 async function loadDataFile(file, autoLoad = false) {
   const parsed = JSON.parse(await file.text());
   validateData(parsed);
@@ -321,7 +348,7 @@ async function loadDataFile(file, autoLoad = false) {
   selectedId = data.companies[0].id;
   renderCompany();
   renderTimeline();
-  drawMarkers();
+  applyFilters();
   fitMapToData();
   dataModeLabel = autoLoad ? 'AUTO-LOAD ON VISIT' : 'LOCAL FILE';
   byId('data-mode').textContent = dataModeLabel;
@@ -418,7 +445,16 @@ byId('theme-toggle').addEventListener('click', () => {
   byId('theme-toggle').querySelector('.theme-label').textContent = light ? 'LIGHT MODE' : 'DARK MODE';
   byId('theme-toggle').querySelector('.theme-icon').textContent = light ? '☾' : '☼';
 });
-byId('reset-map').addEventListener('click', () => { byId('search').value = ''; byId('status-filter').value = 'all'; map.flyTo({ center: [-73.62, 45.54], zoom: 10.15 }); applyFilters(); });
+byId('reset-map').addEventListener('click', () => {
+  byId('search').value = '';
+  byId('status-filter').value = 'all';
+  showProspects = true;
+  byId('toggle-prospects').setAttribute('aria-pressed', 'true');
+  byId('toggle-prospects').textContent = 'PROSPECTS ON';
+  byId('toggle-prospects').title = 'Hide saved and shortlisted job posts';
+  map.flyTo({ center: [-73.62, 45.54], zoom: 10.15 });
+  applyFilters();
+});
 byId('followup-button').addEventListener('click', () => showToast('Follow-up editing is planned for the next version.'));
 byId('notes-button').addEventListener('click', (event) => showToast(event.currentTarget.dataset.notes || 'No notes for this company.'));
 const originDialog = byId('origin-dialog');
