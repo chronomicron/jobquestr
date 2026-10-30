@@ -10,6 +10,20 @@ Use this guide when helping someone prepare their own job-search data for the Jo
 - Write the finished map data to `data/private/jobquestr.json`. This folder is ignored by Git and is not included in the GitHub Pages deployment.
 - Do not send the user's files to a geocoding service, company site, or other external service. Use data already provided by the user unless they ask for external research.
 - Do not extract resume phone numbers, home addresses, or other identity details for the map. They are not needed to plot employers.
+- If a user is working with a browser-only AI assistant, explain that attaching a file sends a copy to that AI service. Ask them to select only the source files needed and avoid attaching resumes or other sensitive documents unless they are comfortable sharing them with that service.
+
+## Browser-only AI workflow
+
+Assume the user may be using ChatGPT Free in a web browser without a coding workspace or access to their computer's folders. Do not claim you can read, edit, or save files directly on their computer. Users can attach supported spreadsheets and documents or paste relevant text into the chat. If the `.md` guide or source file cannot be attached, have them paste its contents or provide a plain-text copy.
+
+For this workflow:
+
+1. If the user is creating their data, use the selected source material. If they are updating existing map data, ask them to attach or paste the current `jobquestr.json` too; do not assume access to files that were not provided in the chat.
+2. Prepare one complete, valid JSON document as the default output. If the chat offers file creation, provide it as a `.json` download. Otherwise, put the entire JSON document in one `json` code block so the user can copy it into a text editor and save it as `jobquestr.json`.
+3. For updates, merge into the supplied JSON and return the complete replacement document. Do not tell the user to paste a new company object after the final `}`: JSON does not support appending records that way. If the full document is too large to return, provide only the specific company object(s) to insert or replace, identify the exact location inside the `companies` array, and explain any required comma.
+4. Tell the user to save the result locally, then use JobQuestR's **Load Data** button to select it. Never ask them to paste personal JSON into the public website or commit it to the repository.
+
+When giving a browser-only workflow, distinguish clearly between a downloadable output and a file saved directly into the user's project. ChatGPT's browser chat can analyze attached files and return content or downloadable files, but it does not thereby gain direct access to arbitrary folders on the user's computer.
 
 ## Prepare the records
 
@@ -29,13 +43,18 @@ Create a UTF-8 JSON object with a `companies` array. Coordinates are `[longitude
 ```json
 {
   "label": "My local job search",
+  "origin": { "label": "Nearby transit stop", "coordinates": [-73.57, 45.50] },
   "companies": [
     {
       "id": "stable-company-id",
       "name": "Company name",
       "sector": "Industry, if known",
       "website": "https://example.com",
+      "photoUrl": "https://example.com/office-front.jpg",
+      "photoAttribution": "Photo credit, if required by the source",
+      "logoUrl": "https://example.com/logo.svg",
       "glassdoorUrl": "",
+      "streetViewUrl": "",
       "address": "Company office or approximate area",
       "locationPrecision": "exact",
       "locationNote": "",
@@ -47,6 +66,7 @@ Create a UTF-8 JSON object with a `companies` array. Coordinates are `[longitude
           "status": "Applied",
           "sourceStatus": "Application submitted",
           "appliedAt": "2026-10-01",
+          "jobDescription": "A concise description from the source posting",
           "location": "Worksite information from the source",
           "workMode": "Hybrid",
           "postingUrl": "https://example.com/job",
@@ -79,10 +99,18 @@ Use `locationPrecision` values `exact`, `approximate`, or `unknown`. Optional va
 - Report how many applications and companies were included, what was excluded, and which locations need confirmation.
 - Do not overwrite an existing `data/private/jobquestr.json` without checking for user edits and preserving them.
 - Tell the user to open JobQuestR, choose **Load Data**, and select their local JSON file. Do not commit or upload that file.
-- If you cannot write to the user's project folder, return a downloadable JSON file or valid JSON content and tell the user where to save it. Do not claim you created a local file you could not access.
+- When you have a coding workspace with authorized access to the project, save the result to `data/private/jobquestr.json` and report the path. If you do not have that access, follow the browser-only workflow above; return a downloadable `.json` file if available, otherwise valid JSON content, and tell the user how to save it. Do not claim you created a local file you could not access.
 
-## Prompt for another AI assistant
+## Prompt for a browser-only AI assistant
 
-The user can provide this file and their selected source files to their own assistant, then ask:
+The user can paste this guide into the chat or attach a plain-text copy, then attach selected source files and, when updating, their current JSON. They can ask:
 
-> Follow `AGENTS.md` to prepare my JobQuestR data. Inspect only the files I provided, preserve them unchanged, group submitted roles by employer, and create or update `data/private/jobquestr.json`. Keep personal information private. Do not publish or commit the JSON. Use approximate pins only when I approve them, and list any records or locations that need my review. If you cannot save to my project folder, give me a downloadable JSON file and tell me where to save it.
+> I use JobQuestR. Follow the data-preparation guide below and inspect only the files I attach or text I paste. Keep my source files unchanged. Group submitted roles under one company, preserve supported facts, and flag missing or uncertain details rather than guessing. Keep personal data private. If I attached an existing `jobquestr.json`, merge into it and return the complete updated document. Otherwise create a new complete document. Return one valid JSON document as a downloadable `.json` file if available; if not, put the entire JSON in one `json` code block. Do not claim you saved anything to my computer. I will save the result locally and select it with JobQuestR's **Load Data** button. List records or locations that need my review.
+
+Then paste or attach this `AGENTS.md` guide and provide the source material. If the complete JSON is too large to return in one response, ask the assistant for company-object snippets with exact insertion instructions rather than copying a partial JSON document as if it were complete.
+
+## Prompt for an assistant with workspace access
+
+When the assistant actually has authorized access to the user's project folder, they can use:
+
+> Follow `AGENTS.md` to prepare my JobQuestR data. Inspect only the files I provided, preserve them unchanged, group submitted roles by employer, and create or update `data/private/jobquestr.json`. Keep personal information private. Do not publish or commit the JSON. Use approximate pins only when I approve them, and list any records or locations that need my review. If you do not have access to my project folder, use the browser-only workflow instead.

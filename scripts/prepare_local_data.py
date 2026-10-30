@@ -190,6 +190,7 @@ def build_data(source: Path, overrides_path: Path) -> dict:
             ),
             "postingUrl": posting_url(posting),
             "postingLabel": re.sub(r"\[[^\]]*\]\([^)]*\)", "", posting).strip(),
+            "jobDescription": record.get("job description", "") or record.get("description", ""),
             "positionId": position,
             "nextAction": "",
             "notes": "",
@@ -218,6 +219,9 @@ def build_data(source: Path, overrides_path: Path) -> dict:
             company["locationPrecision"] = override["locationPrecision"]
         if override.get("locationNote"):
             company["locationNote"] = override["locationNote"]
+        for field in ("website", "photoUrl", "photoAttribution", "logoUrl", "glassdoorUrl", "streetViewUrl", "summary"):
+            if override.get(field):
+                company[field] = override[field]
         company["applications"].sort(key=lambda app: app["appliedAt"] or "")
 
     return {

@@ -16,3 +16,65 @@
 .application-location b{margin-right:5px;color:var(--green);font:9px 'DM Mono',monospace;letter-spacing:.8px}
 .application-source-status{color:var(--dim)}
 .application-posting{display:inline-block;margin-top:8px}
+
+/* Light mode uses ink-blue text and darker status accents for contrast. */
+body[data-theme="light"]{color-scheme:light;--bg:#eef1fa;--panel:#fff;--panel-2:#f5f7ff;--line:#a8b4d0;--line-soft:rgba(38,59,143,.18);--green:#263b8f;--green-soft:#354b9d;--cyan:#075985;--pink:#9b276f;--amber:#825100;--text:#17264a;--muted:#40517a;--dim:#5b6b8e;--shadow:0 0 20px rgba(38,59,143,.08);background-image:linear-gradient(rgba(38,59,143,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(38,59,143,.025) 1px,transparent 1px)}
+body[data-theme="light"] .company-heading h2,body[data-theme="light"] .timeline-header h1,body[data-theme="light"] .today-title,body[data-theme="light"] .company-info,body[data-theme="light"] .app-role,body[data-theme="light"] .track-copy b{color:var(--text)}
+
+.company-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.company-art.has-photo:before,.company-art.has-photo:after{display:none}
+.photo-credit{position:absolute;z-index:1;left:7px;bottom:7px;max-width:65%;padding:3px 5px;border-radius:3px;background:rgba(0,0,0,.72);color:#fff;font:8px/1.3 'DM Mono',monospace}
+.job-description{margin-top:10px;padding-top:9px;border-top:1px solid var(--line-soft)}
+.job-description>b{color:var(--green);font:9px 'DM Mono',monospace;letter-spacing:.8px}
+.job-description p{margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.55;white-space:pre-wrap}
+body[data-theme="light"] .job-description p{color:var(--muted)}
+.origin-marker{width:38px;height:42px;display:grid;place-items:center;border:2px solid var(--cyan);border-radius:50% 50% 50% 6px;background:rgba(4,18,22,.96);box-shadow:0 0 18px rgba(56,223,255,.6);transform:rotate(-45deg);cursor:pointer}
+.origin-marker span{width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:var(--cyan);color:#031316;font:20px/1 Inter,sans-serif;text-shadow:none;transform:rotate(45deg)}
+body[data-theme="light"] .origin-marker{background:rgba(255,255,255,.97);border-color:#075985;box-shadow:0 0 16px rgba(7,89,133,.35)}
+body[data-theme="light"] .origin-marker span{background:#075985;color:#fff}
+.origin-dialog{width:min(470px,calc(100vw - 32px));padding:0;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--text);box-shadow:0 20px 65px rgba(0,0,0,.55)}
+.origin-dialog::backdrop{background:rgba(1,7,8,.75);backdrop-filter:blur(3px)}
+.origin-dialog form{padding:20px}
+.origin-dialog-heading{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+.origin-dialog-heading h2{margin:6px 0 0;color:var(--green);font:700 23px 'Barlow Condensed',sans-serif;letter-spacing:1px}
+.origin-dialog-close{width:30px;height:30px;border:1px solid var(--line);border-radius:4px;background:var(--panel-2);color:var(--muted);font-size:20px;cursor:pointer}
+.origin-field{display:grid;gap:7px;margin-top:12px;color:var(--green);font:9px 'DM Mono',monospace;letter-spacing:.8px}
+.origin-field[hidden]{display:none}
+.origin-field input,.origin-field select{width:100%;height:40px;padding:0 10px;border:1px solid var(--line);border-radius:5px;outline:none;background:var(--panel-2);color:var(--text);font:12px Inter,sans-serif;letter-spacing:0}
+.origin-field input:focus,.origin-field select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(56,223,255,.12)}
+.origin-privacy{margin:12px 0;color:var(--muted);font:10px/1.6 Inter,sans-serif}
+.origin-privacy a{color:var(--cyan)}
+.origin-dialog-status{min-height:16px;color:var(--cyan);font:10px/1.5 'DM Mono',monospace}
+.origin-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.origin-map-pick,.origin-submit{min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:5px;background:var(--panel-2);color:var(--muted);font:9px 'DM Mono',monospace;letter-spacing:.5px;cursor:pointer}
+.origin-submit{border-color:var(--green);background:rgba(0,242,165,.08);color:var(--green)}
+.origin-submit:disabled{opacity:.55;cursor:wait}
+body[data-theme="light"] .origin-dialog::backdrop{background:rgba(16,29,55,.42)}
+body[data-theme="light"] .origin-privacy{color:var(--muted)}
+@media(min-width:961px){
+  .left-rail{overflow:hidden;min-height:0}
+  .rail-topline,.quick-actions,.local-data-note{flex-shrink:0}
+  .company-card,.application-card{flex:1 1 0;min-height:0}
+  .company-card{overflow-y:auto;scrollbar-color:var(--line) transparent;scrollbar-width:thin}
+  .application-card{display:flex;flex-direction:column;overflow:hidden}
+  .section-toggle{flex-shrink:0}
+  .application-details{flex:1;min-height:0;overflow-y:auto;scrollbar-color:var(--line) transparent;scrollbar-width:thin}
+  .company-card::-webkit-scrollbar,.application-details::-webkit-scrollbar{width:6px}
+  .company-card::-webkit-scrollbar-thumb,.application-details::-webkit-scrollbar-thumb{border-radius:6px;background:var(--line)}
+}
+body[data-theme="light"] .company-meta,body[data-theme="light"] .company-desc,body[data-theme="light"] .event-description,body[data-theme="light"] .timeline-controls button,body[data-theme="light"] .tomorrow-row small{color:var(--muted)}
+body[data-theme="light"] .search-box input,body[data-theme="light"] .search-box input::placeholder,body[data-theme="light"] .filter-select,body[data-theme="light"] .filter-select select,body[data-theme="light"] .travel-option{color:var(--muted)}
+body[data-theme="light"] .small-link{color:var(--green);background:#f5f7ff}
+body[data-theme="light"] .section-toggle{color:var(--green);background:rgba(38,59,143,.07)}
+body[data-theme="light"] .map-heading,body[data-theme="light"] .map-corner-label{color:#344875;text-shadow:none}
+body[data-theme="light"] .map-status{color:#dce8ff}
+body[data-theme="light"] .map-footer{background:#e5eaf7;color:#526184}
+body[data-theme="light"] .map-footer b{color:var(--green)}
+body[data-theme="light"] .route-chip b{color:#00c894}
+body[data-theme="light"] .company-marker{background:rgba(255,255,255,.97)}
+body[data-theme="light"] .company-marker.selected{background:var(--pin-color,var(--pink))}
+body[data-theme="light"] .company-marker.selected span{color:#fff}
+body[data-theme="light"] .nav-item.active{text-shadow:none}
+.company-logo{position:absolute;z-index:1;left:11px;bottom:9px;max-width:150px;max-height:58px;object-fit:contain;padding:6px 8px;border:1px solid rgba(255,255,255,.22);border-radius:5px;background:rgba(5,10,18,.82);box-shadow:0 2px 10px rgba(0,0,0,.22)}
+.forget-data-button{margin-left:auto;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--muted);font:8px 'DM Mono',monospace;cursor:pointer}
+.forget-data-button[hidden]{display:none}

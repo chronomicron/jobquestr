@@ -11,16 +11,79 @@ const sampleData = {
 };
 
 let data = sampleData;
+let dataModeLabel = 'DEMO DATA';
 let selectedId = sampleData.companies[0].id;
 let travelMode = 'transit';
 let markerRefs = [];
 let toastTimer;
+let origin = null;
+let originPlacementActive = false;
+let geocodeCandidates = [];
+let rememberedFileHandle = null;
 
 const byId = (id) => document.getElementById(id);
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+const safeHttpUrl = (value = '') => /^https?:\/\//i.test(String(value)) ? String(value) : '';
+const validCoordinates = (value) => Array.isArray(value) && value.length === 2 && value.every((coordinate) => Number.isFinite(Number(coordinate)));
+function normalizeOrigin(value) {
+  if (!value || !validCoordinates(value.coordinates)) return null;
+  return { label: String(value.label || 'Transit start point'), coordinates: value.coordinates.map(Number) };
+}
+function loadSavedOrigin() {
+  try { return normalizeOrigin(JSON.parse(localStorage.getItem('jobquestr-origin') || 'null')); }
+  catch { return null; }
+}
+function handleStoreRequest(mode, operation, value) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('jobquestr-browser-data', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('handles');
+    request.onerror = () => reject(request.error || new Error('Could not access browser storage.'));
+    request.onsuccess = () => {
+      const db = request.result;
+      const transaction = db.transaction('handles', mode);
+      const store = transaction.objectStore('handles');
+      const result = operation === 'get' ? store.get('jobquest-data') : operation === 'delete' ? store.delete('jobquest-data') : store.put(value, 'jobquest-data');
+      result.onsuccess = () => resolve(result.result);
+      result.onerror = () => reject(result.error || new Error('Could not update browser storage.'));
+      transaction.oncomplete = () => db.close();
+      transaction.onerror = () => { db.close(); reject(transaction.error || new Error('Could not update browser storage.')); };
+    };
+  });
+}
+const getSavedFileHandle = () => handleStoreRequest('readonly', 'get');
+const saveFileHandle = (handle) => handleStoreRequest('readwrite', 'put', handle);
+const forgetFileHandle = () => handleStoreRequest('readwrite', 'delete');
+function saveOrigin() {
+  data.origin = origin;
+  try {
+    if (origin) localStorage.setItem('jobquestr-origin', JSON.stringify(origin));
+    else localStorage.removeItem('jobquestr-origin');
+  } catch { /* The origin remains available for this session when storage is unavailable. */ }
+  renderOriginControl();
+}
 const selectedCompany = () => data.companies.find((company) => company.id === selectedId) || data.companies[0];
 const currentApplications = () => data.companies.flatMap((company) => (company.applications || []).map((application) => ({ ...application, companyName: company.name, companyId: company.id })));
 const latestApplication = (company) => [...(company?.applications || [])].sort((a, b) => (b.appliedAt || '').localeCompare(a.appliedAt || ''))[0];
+
+origin = normalizeOrigin(sampleData.origin) || loadSavedOrigin();
+
+function renderOriginControl() {
+  const chip = document.querySelector('.origin-chip');
+  if (!chip) return;
+  chip.querySelector('small').textContent = origin ? `${origin.label} · click to move` : (originPlacementActive ? 'Click the map to place it' : 'Set a transit origin');
+  const button = byId('set-origin');
+  button.textContent = originPlacementActive ? '×' : origin ? '↻' : '＋';
+  button.setAttribute('aria-label', originPlacementActive ? 'Cancel origin placement' : origin ? 'Move commute origin' : 'Set commute origin');
+  button.title = originPlacementActive ? 'Cancel placement' : origin ? 'Move start pin' : 'Set start pin';
+}
+function beginOriginPlacement() {
+  if (originDialog?.open) originDialog.close();
+  originPlacementActive = true;
+  renderOriginControl();
+  map.getCanvasContainer().style.cursor = 'crosshair';
+  showToast('Click the map to place your transit start pin. Press Escape to cancel.');
+}
+renderOriginControl();
 
 function showToast(message) {
   const toast = byId('toast');
@@ -31,10 +94,10 @@ function showToast(message) {
 }
 
 function statusColor(status = '') {
-  if (/interview/i.test(status)) return '#38dfff';
-  if (/not selected|rejected/i.test(status)) return '#ff43c6';
-  if (/follow/i.test(status)) return '#ff43c6';
-  return '#00f2a5';
+  const light = document.body.dataset.theme === 'light';
+  if (/interview/i.test(status)) return light ? '#075985' : '#38dfff';
+  if (/not selected|rejected|follow/i.test(status)) return light ? '#9b276f' : '#ff43c6';
+  return light ? '#263b8f' : '#00f2a5';
 }
 
 function initials(name = '') {
@@ -58,29 +121,50 @@ function renderCompany() {
   const application = applications[0];
   const status = application?.status || 'Prospect';
   const statusTagClass = status === 'Not selected' ? 'pink' : status === 'Interview' ? 'blue' : 'green';
-  const website = company.website ? `<a class="small-link" href="${escapeHtml(company.website)}" target="_blank" rel="noreferrer">COMPANY SITE ↗</a>` : '';
-  const glassdoor = company.glassdoorUrl ? `<a class="small-link" href="${escapeHtml(company.glassdoorUrl)}" target="_blank" rel="noreferrer">GLASSDOOR ↗</a>` : '';
+  const websiteUrl = safeHttpUrl(company.website);
+  const photoUrl = safeHttpUrl(company.photoUrl);
+  const logoUrl = safeHttpUrl(company.logoUrl);
+  const directGlassdoorUrl = safeHttpUrl(company.glassdoorUrl);
+  const glassdoorUrl = directGlassdoorUrl || `https://www.glassdoor.ca/Search/results.htm?keyword=${encodeURIComponent(company.name)}`;
+  const streetViewUrl = safeHttpUrl(company.streetViewUrl) || (company.locationPrecision === 'exact' && company.coordinates ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${company.coordinates[1]},${company.coordinates[0]}` : '');
+  const mapsUrl = streetViewUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([company.name, company.address].filter(Boolean).join(' '))}`;
+  const website = websiteUrl ? `<a class="small-link" href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener noreferrer">COMPANY SITE ↗</a>` : '';
+  const glassdoorLabel = directGlassdoorUrl ? 'GLASSDOOR PROFILE ↗' : 'SEARCH GLASSDOOR ↗';
+  const glassdoor = `<a class="small-link" href="${escapeHtml(glassdoorUrl)}" target="_blank" rel="noopener noreferrer">${glassdoorLabel}</a>`;
+  const profileImage = photoUrl
+    ? `<img class="company-photo" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(company.name)} office" loading="lazy" referrerpolicy="no-referrer" />`
+    : logoUrl ? `<img class="company-logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(company.name)} logo" loading="lazy" referrerpolicy="no-referrer" />` : '';
+  const photoCredit = photoUrl && company.photoAttribution ? `<span class="photo-credit">${escapeHtml(company.photoAttribution)}</span>` : '';
   byId('company-card').innerHTML = `
-    <div class="company-art"><span class="selected-badge">◉ &nbsp;SELECTED</span></div>
+    <div class="company-art${photoUrl ? ' has-photo' : ''}">${profileImage}${photoCredit}<span class="selected-badge">◉ &nbsp;SELECTED</span></div>
     <div class="company-info">
       <div class="company-heading"><div><h2>${escapeHtml(company.name)}</h2><div class="company-sector">${escapeHtml(company.sector || 'Company')}</div></div></div>
       <div class="company-meta"><span class="loc"><span>⌖</span>${escapeHtml(company.address || 'Address not provided')}</span><span class="distance">${company.locationPrecision === 'approximate' ? 'AREA PIN' : (company.distance ? escapeHtml(company.distance) : '—')}</span></div>
       ${company.locationNote ? `<div class="location-note">${escapeHtml(company.locationNote)}</div>` : ''}
       <div class="tag-row"><span class="tag ${statusTagClass}">${escapeHtml(status)}</span><span class="tag blue">${escapeHtml(application?.workMode || 'LOCATION')}</span><span class="tag pink">${escapeHtml(application?.priority || 'TRACKED')}</span></div>
       <div class="company-desc">${escapeHtml(company.summary || 'Company details and application notes appear here when available in your local data file.')}</div>
-      <div class="company-links">${website}${glassdoor || '<span class="small-link muted-link">GLASSDOOR LINK</span>'}<button class="small-link" id="streetview-link" type="button">STREET VIEW ↗</button></div>
+      <div class="company-links">${website}${glassdoor}<a class="small-link" href="${escapeHtml(mapsUrl)}" target="_blank" rel="noopener noreferrer">${streetViewUrl ? 'STREET VIEW ↗' : 'GOOGLE MAPS ↗'}</a></div>
     </div>`;
-  byId('streetview-link')?.addEventListener('click', () => showToast('Street View integration is planned for a later version.'));
+  byId('company-card').querySelector('.company-photo, .company-logo')?.addEventListener('error', (event) => {
+    if (event.currentTarget.classList.contains('company-photo') && logoUrl) {
+      byId('company-card').querySelector('.photo-credit')?.remove();
+      event.currentTarget.outerHTML = `<img class="company-logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(company.name)} logo" loading="lazy" referrerpolicy="no-referrer" />`;
+      byId('company-card').querySelector('.company-logo')?.addEventListener('error', (logoEvent) => logoEvent.currentTarget.remove());
+      return;
+    }
+    event.currentTarget.remove();
+  });
   byId('application-details').innerHTML = applications.length ? applications.map((item) => `
     <article class="application-entry">
       <div class="application-role-row"><div class="app-role">${escapeHtml(item.role || 'Role not specified')}</div><span class="tag ${item.status === 'Not selected' ? 'pink' : item.status === 'Interview' ? 'blue' : 'green'}">${escapeHtml(item.status || 'Applied')}</span></div>
       <div class="app-date">APPLIED &nbsp;${escapeHtml(formatDate(item.appliedAt))}${item.positionId ? ` &nbsp;·&nbsp; ${escapeHtml(item.positionId)}` : ''}</div>
       ${item.location ? `<div class="application-location"><b>WORKSITE</b> ${escapeHtml(item.location)}</div>` : ''}
+      ${item.jobDescription ? `<div class="job-description"><b>JOB DESCRIPTION</b><p>${escapeHtml(item.jobDescription)}</p></div>` : ''}
       ${item.sourceStatus ? `<div class="application-source-status">${escapeHtml(item.sourceStatus)}</div>` : ''}
       ${item.postingUrl ? `<a class="small-link application-posting" href="${escapeHtml(item.postingUrl)}" target="_blank" rel="noreferrer">VIEW POSTING ↗</a>` : ''}
     </article>`).join('') : '<div class="empty-state">No applications recorded for this company yet.</div>';
   byId('notes-button').setAttribute('data-notes', application?.notes || 'No local notes for this company.');
-  byId('data-mode').textContent = data.label || 'LOCAL DATA';
+  byId('data-mode').textContent = dataModeLabel;
 }
 
 function renderTimeline() {
@@ -140,7 +224,35 @@ function drawMarkers() {
     const marker = new maplibregl.Marker({ element: node, anchor: 'bottom' }).setLngLat(company.coordinates).addTo(map);
     markerRefs.push(marker);
   }
+  if (origin?.coordinates) {
+    const home = document.createElement('button');
+    home.type = 'button';
+    home.className = 'origin-marker';
+    home.setAttribute('aria-label', 'Your transit start point. Click to move it.');
+    home.title = 'Your transit start point';
+    home.innerHTML = '<span>⌂</span>';
+    home.addEventListener('click', beginOriginPlacement);
+    markerRefs.push(new maplibregl.Marker({ element: home, anchor: 'bottom' }).setLngLat(origin.coordinates).addTo(map));
+  }
   byId('map-status').innerHTML = `<span class="status-square"></span><span>${visibleCompanies.length} COMPANY SIGNAL${visibleCompanies.length === 1 ? '' : 'S'}</span><span class="status-divider">·</span><span>1 SELECTED</span>`;
+}
+
+function fitMapToData() {
+  if (!map.isStyleLoaded()) {
+    map.once('load', fitMapToData);
+    return;
+  }
+  const points = data.companies.map((company) => company.coordinates).filter(validCoordinates);
+  if (origin?.coordinates) points.push(origin.coordinates);
+  if (!points.length) return;
+  const distinctPoints = [...new Map(points.map((point) => [point.map(Number).join(','), point.map(Number)])).values()];
+  if (distinctPoints.length === 1) {
+    map.flyTo({ center: distinctPoints[0], zoom: 12, duration: 650 });
+    return;
+  }
+  const bounds = new maplibregl.LngLatBounds(distinctPoints[0], distinctPoints[0]);
+  distinctPoints.slice(1).forEach((point) => bounds.extend(point));
+  map.fitBounds(bounds, { padding: { top: 90, right: 70, bottom: 65, left: 70 }, maxZoom: 12, duration: 700 });
 }
 
 function selectCompany(id) {
@@ -154,6 +266,22 @@ function selectCompany(id) {
 
 map.on('load', drawMarkers);
 map.on('styledata', () => { if (!markerRefs.length && data.companies.length) drawMarkers(); });
+map.on('click', (event) => {
+  if (!originPlacementActive) return;
+  origin = { label: 'Transit start point', coordinates: [event.lngLat.lng, event.lngLat.lat] };
+  originPlacementActive = false;
+  map.getCanvasContainer().style.cursor = '';
+  try { localStorage.removeItem('jobquestr-origin-address'); } catch { /* Ignore unavailable browser storage. */ }
+  saveOrigin();
+  drawMarkers();
+  showToast('Start pin saved on this device.');
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !originPlacementActive) return;
+  originPlacementActive = false;
+  map.getCanvasContainer().style.cursor = '';
+  renderOriginControl();
+});
 
 function applyFilters() {
   const query = byId('search').value.trim().toLowerCase();
@@ -173,6 +301,7 @@ function applyFilters() {
 
 function validateData(value) {
   if (!value || !Array.isArray(value.companies)) throw new Error('Expected a JSON object with a “companies” array.');
+  if (value.origin && !normalizeOrigin(value.origin)) throw new Error('Origin must include [longitude, latitude] coordinates.');
   for (const company of value.companies) {
     if (!company.id || !company.name) throw new Error('Each company needs an id and name.');
     if (company.coordinates && (!Array.isArray(company.coordinates) || company.coordinates.length !== 2 || company.coordinates.some((n) => !Number.isFinite(Number(n))))) throw new Error(`Coordinates for ${company.name} must be [longitude, latitude].`);
@@ -182,23 +311,93 @@ function validateData(value) {
 
 byId('search').addEventListener('input', applyFilters);
 byId('status-filter').addEventListener('change', applyFilters);
-byId('load-data').addEventListener('click', () => byId('file-input').click());
+async function loadDataFile(file, autoLoad = false) {
+  const parsed = JSON.parse(await file.text());
+  validateData(parsed);
+  if (!parsed.companies.length) throw new Error('This file has no companies yet.');
+  data = { ...parsed, label: parsed.label || 'LOCAL DATA' };
+  origin = normalizeOrigin(parsed.origin) || loadSavedOrigin();
+  if (parsed.origin) saveOrigin(); else renderOriginControl();
+  selectedId = data.companies[0].id;
+  renderCompany();
+  renderTimeline();
+  drawMarkers();
+  fitMapToData();
+  dataModeLabel = autoLoad ? 'AUTO-LOAD ON VISIT' : 'LOCAL FILE';
+  byId('data-mode').textContent = dataModeLabel;
+  byId('forget-data').hidden = !rememberedFileHandle;
+  showToast(`Loaded ${data.companies.length} companies locally.`);
+}
+
+async function openDataFile() {
+  if (typeof window.showOpenFilePicker !== 'function') {
+    byId('file-input').click();
+    return;
+  }
+  try {
+    if (rememberedFileHandle) {
+      let permission = 'prompt';
+      try { permission = await rememberedFileHandle.requestPermission({ mode: 'read' }); }
+      catch { /* Fall through to a fresh file selection if permission cannot be renewed. */ }
+      if (permission === 'granted') {
+        await loadDataFile(await rememberedFileHandle.getFile(), true);
+        return;
+      }
+    }
+    const [handle] = await window.showOpenFilePicker({
+      multiple: false,
+      types: [{ description: 'JobQuestR data', accept: { 'application/json': ['.json'] } }],
+    });
+    rememberedFileHandle = handle;
+    let remembered = false;
+    try {
+      await saveFileHandle(handle);
+      remembered = true;
+    } catch { /* The data can still be used when persistent handles are unavailable. */ }
+    await loadDataFile(await handle.getFile(), remembered);
+  } catch (error) {
+    if (error.name !== 'AbortError') showToast(error.message || 'Could not open that data file.');
+  }
+}
+
+async function restoreRememberedData() {
+  if (!window.indexedDB) return;
+  try {
+    rememberedFileHandle = await getSavedFileHandle();
+    if (!rememberedFileHandle) return;
+    byId('forget-data').hidden = false;
+    const permission = await rememberedFileHandle.queryPermission({ mode: 'read' });
+    if (permission === 'granted') {
+      await loadDataFile(await rememberedFileHandle.getFile(), true);
+    } else {
+      dataModeLabel = 'CLICK LOAD DATA TO RECONNECT';
+      byId('data-mode').textContent = dataModeLabel;
+      byId('load-data').title = 'Reconnect to your remembered local JSON file';
+    }
+  } catch {
+    dataModeLabel = 'CHOOSE LOCAL DATA FILE';
+    byId('data-mode').textContent = dataModeLabel;
+  }
+}
+
+byId('load-data').addEventListener('click', openDataFile);
 byId('file-input').addEventListener('change', async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
   try {
-    const parsed = JSON.parse(await file.text());
-    validateData(parsed);
-    data = { ...parsed, label: parsed.label || 'LOCAL DATA' };
-    if (!data.companies.length) throw new Error('This file has no companies yet.');
-    selectedId = data.companies[0].id;
-    byId('data-mode').textContent = data.label;
-    renderCompany(); renderTimeline(); drawMarkers();
-    if (selectedCompany()?.coordinates) map.flyTo({ center: selectedCompany().coordinates, zoom: 10.5 });
-    showToast(`Loaded ${data.companies.length} companies locally.`);
+    await loadDataFile(file);
   } catch (error) {
     showToast(error.message || 'Could not read that file.');
   } finally { event.target.value = ''; }
+});
+byId('forget-data').addEventListener('click', async () => {
+  try { await forgetFileHandle(); } catch { /* The current page can still unlink its in-memory handle. */ }
+  rememberedFileHandle = null;
+  byId('forget-data').hidden = true;
+  byId('load-data').title = '';
+  dataModeLabel = data.label || 'LOCAL DATA';
+  byId('data-mode').textContent = dataModeLabel;
+  showToast('Remembered file unlinked. Your JSON file was not changed.');
 });
 byId('application-toggle').addEventListener('click', () => {
   const button = byId('application-toggle');
@@ -213,6 +412,8 @@ byId('theme-toggle').addEventListener('click', () => {
   document.body.dataset.theme = light ? 'light' : 'dark';
   map.setStyle(`https://tiles.openfreemap.org/styles/${light ? 'positron' : 'dark'}`);
   map.once('style.load', drawMarkers);
+  renderTimeline();
+  drawMarkers();
   byId('theme-toggle').setAttribute('aria-label', light ? 'Switch to dark mode' : 'Switch to light mode');
   byId('theme-toggle').querySelector('.theme-label').textContent = light ? 'LIGHT MODE' : 'DARK MODE';
   byId('theme-toggle').querySelector('.theme-icon').textContent = light ? '☾' : '☼';
@@ -220,7 +421,84 @@ byId('theme-toggle').addEventListener('click', () => {
 byId('reset-map').addEventListener('click', () => { byId('search').value = ''; byId('status-filter').value = 'all'; map.flyTo({ center: [-73.62, 45.54], zoom: 10.15 }); applyFilters(); });
 byId('followup-button').addEventListener('click', () => showToast('Follow-up editing is planned for the next version.'));
 byId('notes-button').addEventListener('click', (event) => showToast(event.currentTarget.dataset.notes || 'No notes for this company.'));
-byId('set-origin').addEventListener('click', () => showToast('Origin selection and commute estimates are planned for a later version.'));
+const originDialog = byId('origin-dialog');
+const originForm = byId('origin-form');
+const originAddress = byId('origin-address');
+const originResult = byId('origin-result');
+const originResultField = byId('origin-result-field');
+const originSubmit = byId('origin-submit');
+byId('set-origin').addEventListener('click', () => {
+  try { originAddress.value = localStorage.getItem('jobquestr-origin-address') || ''; }
+  catch { originAddress.value = ''; }
+  originResultField.hidden = true;
+  geocodeCandidates = [];
+  originSubmit.textContent = 'FIND ADDRESS ↗';
+  originDialog.showModal();
+  originAddress.focus();
+});
+byId('origin-dialog-close').addEventListener('click', () => originDialog.close());
+byId('origin-map-pick').addEventListener('click', beginOriginPlacement);
+originAddress.addEventListener('input', () => {
+  geocodeCandidates = [];
+  originResultField.hidden = true;
+  originSubmit.textContent = 'FIND ADDRESS ↗';
+  byId('origin-dialog-status').textContent = '';
+});
+originForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const status = byId('origin-dialog-status');
+  const address = originAddress.value.trim();
+  if (!address) return;
+  originSubmit.disabled = true;
+  status.textContent = 'Looking up this stop or place…';
+  try {
+    if (geocodeCandidates.length) {
+      const chosen = geocodeCandidates[Number(originResult.value)];
+      if (!chosen) throw new Error('Choose one of the matching places.');
+      origin = { label: 'Transit start point', coordinates: chosen.coordinates };
+      try { localStorage.setItem('jobquestr-origin-address', address); } catch { /* Pin still works for this session. */ }
+      saveOrigin();
+      originDialog.close();
+      map.flyTo({ center: origin.coordinates, zoom: Math.max(map.getZoom(), 14) });
+      drawMarkers();
+      showToast('Start pin set from the selected place.');
+      return;
+    }
+
+    const query = new URL('https://photon.komoot.io/api/');
+    query.searchParams.set('q', address);
+    query.searchParams.set('limit', '5');
+    query.searchParams.set('lang', 'en');
+    query.searchParams.set('lat', '45.5017');
+    query.searchParams.set('lon', '-73.5673');
+    const response = await fetch(query, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(response.status === 429 ? 'Photon is busy. Try placing the pin directly on the map.' : 'Address lookup is unavailable. Try placing the pin directly on the map.');
+    const result = await response.json();
+    geocodeCandidates = (result.features || []).filter((feature) => validCoordinates(feature.geometry?.coordinates)).map((feature) => {
+      const place = feature.properties || {};
+      const street = [place.housenumber, place.street].filter(Boolean).join(' ');
+      const label = [...new Set([place.name, street, place.city, place.state, place.country].filter(Boolean))].join(', ');
+      return { label: label || address, coordinates: feature.geometry.coordinates.map(Number) };
+    });
+    if (!geocodeCandidates.length) throw new Error('No matching stop or place found. Try a nearby intersection or station name.');
+    try { localStorage.setItem('jobquestr-origin-address', address); } catch { /* Address remains in the dialog for this session. */ }
+    originResult.replaceChildren(...geocodeCandidates.map((candidate, index) => {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = candidate.label;
+      return option;
+    }));
+    originResultField.hidden = false;
+    originSubmit.textContent = 'SET START PIN';
+    status.textContent = geocodeCandidates.length === 1 ? 'Place found. Confirm to set the pin.' : 'Choose the matching place, then set the pin.';
+  } catch (error) {
+    geocodeCandidates = [];
+    originResultField.hidden = true;
+    status.textContent = error.message || 'Address lookup failed. Try placing the pin directly on the map.';
+  } finally {
+    originSubmit.disabled = false;
+  }
+});
 document.querySelectorAll('.travel-option').forEach((button) => button.addEventListener('click', () => {
   travelMode = button.dataset.mode;
   document.querySelectorAll('.travel-option').forEach((item) => item.classList.toggle('selected', item === button));
@@ -233,3 +511,4 @@ byId('timeline-filter').addEventListener('click', () => showToast('Activity filt
 
 renderCompany();
 renderTimeline();
+restoreRememberedData();
